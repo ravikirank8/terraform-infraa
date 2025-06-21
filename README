@@ -1,0 +1,46 @@
+We have created a folder static-web-app under root folder. This folder contains files to create a simple Node.js web application which displays a one-line message.
+
+Open the lab console and configure following environment variables with your own GitHub account information:
+
+vi /root/github_repo_info.json
+{
+    "REPO_OWNER": "your_username_here",
+    "ACCESS_TOKEN": "your_access_token_here"
+}
+
+#We have created an S3 bucket with prefix terraform-web-app-bucket- for you. Create a zipped file for the contents of the static-web-app repository and upload it to this bucket.
+
+Navigate to the static-web-app directory.
+
+Zip the contents of this folder:
+
+zip ../app-v1.zip -r * .[^.]*
+Now, execute the following commands from the /root to upload this zipped file to the S3 bucket:
+aws s3 cp app-v1.zip s3://terraform-web-app-bucket-<random_suffix>/
+Replace the <random_suffix> with the exact suffix in the bucket name from the AWS management console.
+
+
+We have created an application named terraform-web-app running on version 20 of Node.js in Elastic Beanstalk. This application needs an environment called devm. Execute the following commands in the terminal so that this environment is created:
+
+cd /root;
+bucket_name=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'terraform-web-app-bucket-')].Name" --output text);
+STACKS=$(aws elasticbeanstalk list-available-solution-stacks --query 'SolutionStacks' --output text);
+STACKS_NEWLINE=$(echo "$STACKS" | tr "\t" "\n");
+LATEST_STACK=$(echo "$STACKS_NEWLINE" | grep "64bit Amazon Linux 2023.*running Node.js 20" | sort -V | tail -n 1);
+echo "$LATEST_STACK";
+aws elasticbeanstalk create-environment --application-name terraform-web-app --environment-name devm --solution-stack-name "$LATEST_STACK" --version-label v1 --option-settings file://options.json;
+aws elasticbeanstalk create-application-version --application-name terraform-web-app --version-label v1 --source-bundle S3Bucket="$bucket_name",S3Key=app-v1.zip
+
+Then, go and analyze the application URL from the AWS Management console. The application might take some time to get deployed.
+
+Once deployed, you should see the following message on visiting the devm environment domain URL:
+
+Hello, World!
+This is a simple static web app.
+
+
+task1
+
+We used an S3 bucket to deploy an application to Elastic Beanstalk. We will now use AWS CodePipeline to deploy the application to Beanstalk by sourcing the code from a git repository.
+
+We will use the repository terraform-infra as the source repository and the devm environment of the terraform-web-app Node.js application as the deployment target.
